@@ -114,7 +114,7 @@ const isoDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const dayName = (iso) =>
-    new Date(`${iso}T12:00:00`).toLocaleString('en-US', {weekday: 'long'});
+    new Date(`${iso}T12:00:00`).toLocaleString(undefined, {weekday: 'long'});
 
 // Extension lifecycle: enable() creates everything, disable() must destroy/disconnect all.
 // GNOME Shell will hard-crash on reload if any references leak past disable().
@@ -261,7 +261,7 @@ export default class WeatherExtension extends Extension {
     _formatTime(isoStr) {
         if (!isoStr) return '';
         const d = new Date(isoStr);
-        return d.toLocaleString('en-US', {hour: 'numeric', minute: '2-digit', hour12: true});
+        return d.toLocaleString(undefined, {hour: 'numeric', minute: '2-digit'});
     }
 
     _weatherDesc(code) {
@@ -996,7 +996,7 @@ const precipColor = '#64b5f6';
                                 const hWind = Math.round(hourly.wind_speed_10m?.[idx] ?? 0)
                                 const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), idx);
                                 const label = i === 0 ? 'Now' :
-                                    dt.toLocaleString('en-US', {hour: 'numeric', hour12: true});
+                                    dt.toLocaleString(undefined, {hour: 'numeric'});
                                 items.push({
                                     label,
                                     temp: hTemp,
@@ -1049,7 +1049,7 @@ const precipColor = '#64b5f6';
                                     const date = daily.time[d];
                                     const dt = new Date(date + 'T12:00:00');
                                     const dayLabel = date === todayStr ? 'Today' :
-                                        dt.toLocaleString('en-US', {weekday: 'short'});
+                                        dt.toLocaleString(undefined, {weekday: 'short'});
                                     const tc = topCodes(dayCodes[date]);
                                     dailyItems.push({
                                         label: dayLabel,
@@ -1111,12 +1111,11 @@ const precipColor = '#64b5f6';
         if (this._location) {
             let subtitle = '7-Day Forecast';
             if (this._allDaily.length >= 2) {
-                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                const first = new Date(this._allDaily[0].date + 'T12:00:00');
-                const last = new Date(this._allDaily[this._allDaily.length - 1].date + 'T12:00:00');
-                const fStr = `${months[first.getMonth()]} ${first.getDate()}`;
-                const lStr = `${months[last.getMonth()]} ${last.getDate()}`;
-                subtitle = `${fStr} — ${lStr}`;
+                const monthDay = (iso) => new Date(`${iso}T12:00:00`)
+                    .toLocaleString(undefined, {month: 'short', day: 'numeric'});
+                const first = monthDay(this._allDaily[0].date);
+                const last = monthDay(this._allDaily[this._allDaily.length - 1].date);
+                subtitle = `${first} — ${last}`;
             }
             this._addHeader(subtitle);
         }
