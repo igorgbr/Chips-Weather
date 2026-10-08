@@ -108,6 +108,14 @@ const WEATHER_SHORT = {
 
 const WIND_DIRS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 
+// Local calendar date (YYYY-MM-DD). Not toISOString(): that shifts to UTC
+// and can land on the previous day.
+const isoDate = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const dayName = (iso) =>
+    new Date(`${iso}T12:00:00`).toLocaleString('en-US', {weekday: 'long'});
+
 // Extension lifecycle: enable() creates everything, disable() must destroy/disconnect all.
 // GNOME Shell will hard-crash on reload if any references leak past disable().
 export default class WeatherExtension extends Extension {
@@ -301,13 +309,7 @@ export default class WeatherExtension extends Extension {
 
     _showTooltip(row, day, unit, isF) {
         this._hideTooltip();
-        const todayName = new Date().toLocaleString('en-US', {weekday: 'long'});
-        const shorts = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-        const idx = shorts.indexOf(day.label);
-        const targetDay = day.label === 'Today' ? todayName :
-            idx >= 0 ? weekdays[idx] : todayName;
-        const hours = this._allForecast.filter(f => f.day === targetDay);
+        const hours = this._allForecast.filter(f => f.date === day.date);
 
         const periodStats = (ph) => {
             if (!ph || ph.length === 0) return null;
@@ -504,7 +506,7 @@ export default class WeatherExtension extends Extension {
 
         let forecast = this._allForecast;
         if (this._activeDay)
-            forecast = this._allForecast.filter(f => f.day === this._activeDay);
+            forecast = this._allForecast.filter(f => f.date === this._activeDay);
 
         const unit = (this._settings?.get_string('temperature-unit') === 'fahrenheit')
             ? '°F' : '°C';
@@ -543,12 +545,12 @@ export default class WeatherExtension extends Extension {
             let subtitle = 'Hourly';
             if (forecast.length > 0) {
                 const perPage = 8;
-                const todayDay = this._allForecast[0]?.day || '';
+                const todayDate = this._allForecast[0]?.date || '';
                 const headerItems = forecast.slice(
                     this._forecastPage * perPage, this._forecastPage * perPage + perPage,
                 );
-                const days = [...new Set(headerItems.map(f => f.day).filter(Boolean))];
-                const labels = days.map(d => d === todayDay ? 'Today' : d);
+                const dates = [...new Set(headerItems.map(f => f.date).filter(Boolean))];
+                const labels = dates.map(d => d === todayDate ? 'Today' : dayName(d));
                 subtitle = labels.join(' & ') + ' — Hourly';
             }
             this._addHeader(subtitle);
@@ -995,13 +997,12 @@ const precipColor = '#64b5f6';
                                 const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), idx);
                                 const label = i === 0 ? 'Now' :
                                     dt.toLocaleString('en-US', {hour: 'numeric', hour12: true});
-                                const dayKey = dt.toLocaleString('en-US', {weekday: 'long'});
                                 items.push({
                                     label,
                                     temp: hTemp,
                                     iconCode: hCode,
                                     isDay: hIsDay,
-                                    day: dayKey,
+                                    date: isoDate(dt),
                                     hour: dt.getHours(),
                                     uv: hUv,
                                     precip: hPrecip,
@@ -1042,7 +1043,7 @@ const precipColor = '#64b5f6';
                                     return {primary, secondary, showBoth};
                                 };
 
-                                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                                const todayStr = isoDate(now);
                                 const dailyItems = [];
                                 for (let d = 0; d < daily.time.length; d++) {
                                     const date = daily.time[d];
@@ -1222,14 +1223,7 @@ const precipColor = '#64b5f6';
                 row.connect('enter-event', () => { row.opacity = 180; this._showTooltip(row, day, unit, unit === '°F'); });
                 row.connect('leave-event', () => { row.opacity = 255; this._hideTooltip(); });
                 row.connect('button-press-event', () => {
-                    const now = new Date();
-                    const todayName = now.toLocaleString('en-US', {weekday: 'long'});
-                    const shorts = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-                    const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-                    const idx = shorts.indexOf(day.label);
-                    const targetDay = day.label === 'Today' ? todayName :
-                        idx >= 0 ? weekdays[idx] : todayName;
-                    this._activeDay = targetDay;
+                    this._activeDay = day.date;
                     this._forecastPage = 0;
                     this._viewMode = 'hourly';
                     this._fadeToPage();
